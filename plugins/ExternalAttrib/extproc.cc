@@ -35,7 +35,7 @@ public:
 	ExtProcImpl(const char* fname, const char* iname);
 	~ExtProcImpl();
 	
-	void			startInst( ProcInst* pi );
+	void			startInst( QProcess* pi );
 	
 	bool			getParam();
 	void			setFile(const char* fname, const char* iname);
@@ -90,57 +90,97 @@ void ExtProcImpl::startInst( ProcInst* pi )
 	params.replace("\"","\"\""); 
 	params.embed('"','"');
 #endif
-	char* args[5];
-	if (infile.isEmpty()) {
-		args[0] = (char*) exfile.getCStr();
-		args[1] = (char*) "-c";
-		args[2] = (char*) params.getCStr();
-		args[3] = 0;
-	} else if (exfile.isEmpty()) {
-		ErrMsg("ExtProcImpl::startInst - no external attribute file provided");
-	} else {
-		args[0] = (char*) infile.getCStr();
-		args[1] = (char*) exfile.getCStr();
-		args[2] = (char*) "-c";
-		args[3] = (char*) params.getCStr();
-		args[4] = 0;
-	}
-	if (!pi->start( args, seisInfo ))
-	{
-		ErrMsg("ExtProcImpl::startInst - run error");
-	}
+//	char* args[5];
+//	if (infile.isEmpty()) {
+//		args[0] = (char*) exfile.getCStr();
+//		args[1] = (char*) "-c";
+//		args[2] = (char*) params.getCStr();
+//		args[3] = 0;
+//	} else if (exfile.isEmpty()) {
+//		ErrMsg("ExtProcImpl::startInst - no external attribute file provided");
+//	} else {
+//		args[0] = (char*) infile.getCStr();
+//		args[1] = (char*) exfile.getCStr();
+//		args[2] = (char*) "-c";
+//		args[3] = (char*) params.getCStr();
+//		args[4] = 0;
+//	}
+//	if (!pi->start( args, seisInfo ))
+//	{
+//		ErrMsg("ExtProcImpl::startInst - run error");
+//	}
+
+	QString program;
+    QStringList arguments;
+    if (infile.isEmpty()) {
+        program = (char*) exfile.getCStr();
+        arguments << "-c" << params.getCStr();
+    } else if (exfile.isEmpty()) {
+        ErrMsg("ExtProcImpl::startInst - no external attribute file provided");
+    } else {
+        program = (char*) infile.getCStr();
+        arguments << exfile.getCStr() << "-c" << params.getCStr();
+    }
+    pi->start( program, arguments );
 	return;
 }
 
 bool ExtProcImpl::getParam()
 {
-	ProcInst pi;
-	bool result = true;
-	BufferString params;
-	char* args[4];
-	if (infile.isEmpty()) {
-		args[0] = (char*) exfile.getCStr();
-		args[1] = (char*) "-g";
-		args[2] = 0;
-	} else if (exfile.isEmpty()) {
-		ErrMsg("ExtProcImpl::getParam - no external attribute file provided");
-		return false;
-	} else {
-		args[0] = (char*) infile.getCStr();
-		args[1] = (char*) exfile.getCStr();
-		args[2] = (char*) "-g";
-		args[3] = 0;
-	}
-	if (pi.start( args )) {
-		params = pi.readAllStdOut();
-		if (pi.finish() != 0 ) {
-			ErrMsg("ExtProcImpl::getParam - external attribute exited abnormally");
-			result = false;
-		}
-	} else {
-		ErrMsg("ExtProcImpl::getParam - run error");
-		result = false;
-	}
+    bool result = true;
+    BufferString params;
+    ProcInst pi;
+    QString program;
+    QStringList arguments;
+    if (infile.isEmpty()) {
+        program = (char*) exfile.getCStr();
+        arguments << "-g";
+    } else if (exfile.isEmpty()) {
+        ErrMsg("ExtProcImpl::getParam - no external attribute file provided");
+    } else {
+        program = (char*) infile.getCStr();
+        arguments << exfile.getCStr() << "-g";
+    }
+    if ( pi.start( program, arguments ) )
+    {
+        if ( pi.waitForFinished(3000) )
+        {
+            params = pi.readAllStandardOutput();
+        } else {
+            ErrMsg("ExtProcImpl::getParam -  external attribute execution error");
+            ErrMsg( pi.readAllStandardError() );
+            result = false
+        }
+    } else
+        result = false;
+    
+//     ProcInst pi;
+// 	bool result = true;
+// 	BufferString params;
+// 	char* args[4];
+// 	if (infile.isEmpty()) {
+// 		args[0] = (char*) exfile.getCStr();
+// 		args[1] = (char*) "-g";
+// 		args[2] = 0;
+// 	} else if (exfile.isEmpty()) {
+// 		ErrMsg("ExtProcImpl::getParam - no external attribute file provided");
+// 		return false;
+// 	} else {
+// 		args[0] = (char*) infile.getCStr();
+// 		args[1] = (char*) exfile.getCStr();
+// 		args[2] = (char*) "-g";
+// 		args[3] = 0;
+// 	}
+// 	if (pi.start( args )) {
+// 		params = pi.readAllStdOut();
+// 		if (pi.finish() != 0 ) {
+// 			ErrMsg("ExtProcImpl::getParam - external attribute exited abnormally");
+// 			result = false;
+// 		}
+// 	} else {
+// 		ErrMsg("ExtProcImpl::getParam - run error");
+// 		result = false;
+// 	}
 	if (result) {
 		jsonpar = json::Deserialize(params.str());
 		if (jsonpar.GetType() == json::NULLVal) {

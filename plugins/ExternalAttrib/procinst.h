@@ -37,8 +37,9 @@ struct SeisInfo
 };
 
 struct ProcInstImpl;
+class QProcess;
 
-class ProcInst {
+class ProcInst : public QProcess {
 public:
 	ProcInst();
 	~ProcInst();
@@ -47,11 +48,13 @@ public:
 	float			getOutput( int output, int idx );
 	void			resize( int nrsamples );
 
-	bool			start( char *const argv[] );
-	bool			start( char *const argv[], SeisInfo& si );
-	int				finish();
+//	bool			start( char *const argv[] );
+//	bool			start( char *const argv[], SeisInfo& si );
+    bool			start( const QString &program, const QStringList &arguments );
+    bool			start( const QString &program, const QStringList &arguments, SeisInfo& si );
+    int				finish();
 	BufferString	logFileName();
-	BufferString	readAllStdOut();
+//	BufferString	readAllStdOut();
 	bool			compute( int z0, int inl, int crl );
 
 	void			processLog();
