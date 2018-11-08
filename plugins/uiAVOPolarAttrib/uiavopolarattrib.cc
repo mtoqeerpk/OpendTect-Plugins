@@ -56,60 +56,59 @@ uiAVOPolarAttrib::uiAVOPolarAttrib( uiParent* p, bool is2d )
     outputfld_ = new uiGenInput( this, uiStrings::sOutput(),StringListInpSpec(outputstr) );
     outputfld_->attach( alignedBelow, inp_gradientfld_ );
 
-    zmarginBGfld_ = new uiGenInput( this, "Background Analysis Z Window (samples)", IntInpIntervalSpec().setName("Samples after",1).setName("Samples before",0) );
-    zmarginBGfld_->attach( alignedBelow, outputfld_ );
-    zmarginBGfld_->valuechanging.notify(mCB(this, uiAVOPolarAttrib,doZmarginCheck) );
+    gateBGfld_ = new uiGenInput( this, zDepLabel(tr("Background "), tr("gate")), FloatInpIntervalSpec().setName("Z start",0).setName("Z stop",1));
+    gateBGfld_->attach( alignedBelow, outputfld_ );
 
     stepoutBGfld_ = new uiStepOutSel( this, is2d );
     stepoutBGfld_->attach( rightTo, zmarginBGfld_ );
-    stepoutBGfld_->valueChanging.notify(mCB(this, uiAVOPolarAttrib,doStepOutCheck) );
-    stepoutBGfld_->setFieldNames( "Inl Stepout", "Crl Stepout" );
+    stepoutBGfld_->setFieldNames( is2d ? "Trace Nr Stepout" : "Inl Stepout", "Crl Stepout" );
 
-    zmarginfld_ = new uiGenInput( this, "Local Analysis Z Window (samples)", IntInpIntervalSpec().setName("Samples after",1).setName("Samples before",0) );
-    zmarginfld_->attach( alignedBelow, zmarginBGfld_ );
-    zmarginfld_->valuechanging.notify(mCB(this, uiAVOPolarAttrib,doZmarginCheck) );
-
+    gatefld_ = new uiGenInput( this, zDepLabel(tr("Local "), tr("gate")), FloatInpIntervalSpec().setName("Z start",0).setName("Z stop",1));
+    gatefld_->attach( alignedBelow, gateBGfld_ );
     
     setHAlignObj( outfld_ );
 }
 
-
-
-
-bool uiGradientAttrib::setParameters( const Attrib::Desc& desc )
+bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
 {
-    if ( desc.attribName() != GradientAttrib::attribName() )
+    if ( desc.attribName() != AVOPolarAttrib::attribName() )
 	return false;
 
-    mIfGetEnum(GradientAttrib::outputStr(),output, outfld_->setValue(output) )
-    mIfGetEnum(GradientAttrib::operatorStr(), opert, operatorfld_->setValue(opert))
-    return true;
-}
-
-
-bool uiGradientAttrib::setInput( const Attrib::Desc& desc )
-{
-    putInp( inpfld_, desc, 0 );
-    return true;
-}
-
-
-bool uiGradientAttrib::getParameters( Attrib::Desc& desc )
-{
-    if ( desc.attribName() != GradientAttrib::attribName() )
-	return false;
-
-    mSetEnum( GradientAttrib::outputStr(), outfld_->getIntValue() );
-    mSetEnum( GradientAttrib::operatorStr(), operatorfld_->getIntValue() );
+    mIfGetEnum(AVOPolarAttrib::outputStr(),output, outfld_->setValue(output) )
+    mIfGetFloatInterval(AVOPolarAttrib::gateBGStr(), gateBG, gateBGfld_->setValue(gateBG))
+    mIfGetBinID(AVOPolarAttrib::stepoutBGStr(),soBG,stepoutBGfld_->setBinID(soBG))
+    mIfGetFloatInterval(AVOPolarAttrib::gateStr(), gate, gatefld_->setValue(gate))
     
     return true;
 }
 
 
-bool uiGradientAttrib::getInput( Attrib::Desc& desc )
+bool uiAVOPolarAttrib::setInput( const Attrib::Desc& desc )
 {
-    inpfld_->processInput();
-    fillInp( inpfld_, desc, 0 );
+    putInp( inp_interceptfld_, desc, 0 );
+    putInp( inp_gradientfld_, desc, 1 );
+    return true;
+}
+
+
+bool uiAVOPolarAttrib::getParameters( Attrib::Desc& desc )
+{
+    if ( desc.attribName() != AVOPolarAttrib::attribName() )
+        return false;
+
+    mSetEnum( AVOPolarAttrib::outputStr(), outfld_->getIntValue() );
+    mSetBinID( AVOPolarAttrib::stepoutBGStr(), stepoutBGfld_->getBinID() );
+    mSetFloatInterval( AVOPolarAttrib::gateBGStr(), gateBGfld_->getFInterval() );
+    mSetFloatInterval( AVOPolarAttrib::gateStr(), gatefld_->getFInterval() );
+
+    return true;
+}
+
+
+bool uiAVOPolarAttrib::getInput( Attrib::Desc& desc )
+{
+    fillInp( inp_interceptfld_, desc, 0 );
+    fillInp( inp_gradientfld_, desc, 1 );
     return true;
 }
 

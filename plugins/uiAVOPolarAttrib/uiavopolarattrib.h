@@ -41,9 +41,9 @@ protected:
     uiAttrSel*		inp_interceptfld_;
     uiAttrSel*		inp_gradientfld_;
     uiGenInput*		outputfld_;
-    uiGenInput*     zmarginBGfld_;
+    uiGenInput*     gateBGfld_;
     uiGenInput*     stepoutBGfld_;
-    uiGenInput*     zmarginfld_;
+    uiGenInput*     gatefld_;
 
     bool        setParameters(const Attrib::Desc&);
     bool        setInput(const Attrib::Desc&);
