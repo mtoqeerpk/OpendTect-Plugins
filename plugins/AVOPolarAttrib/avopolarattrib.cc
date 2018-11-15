@@ -23,6 +23,7 @@
 #include "attribdesc.h"
 #include "attribfactory.h"
 #include "attribparam.h"
+#include "arrayndimpl.h"
 
 #include "math2.h"
 
@@ -151,10 +152,28 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
     const int gateBGsz = samplegateBG.width() + 1;
     const int gatesz = samplegate.width() + 1;
     
-    for ( int idx=0; idx<nrsamples; idx++ ) {
-		setOutputValue( output, 0, idx, z0, outval );
+    const int ntraces = trcpos_.size();
+    const int sz = samplegateBG.width() + nrsamples;
+    Array1DImpl<float> AxB(sz), A2(sz), B2(sz);
+    Array1DImpl<float> Output(nrsamples);
+/*
+    for (int it=0; it<ntraces; it++) {
+        const DataHolder* dataA = interceptdata_[it];
+        const DataHolder* dataB = gradientdata_[it];
+        for ( int idx=0; idx<sz; idx++ ) {
+            float Aval = getInputValue(*dataA, interceptdataidx_, idx, z0);
+            float Bval = getInputValue(*dataB, gradientdataidx_,idx, z0);
+            AxB[idx] += Aval*Bval;
+            A2[idx] += Aval*Aval;
+            B2[idx] += Bval*Bval;
+        }
     }
-
+*/
+    for (int idx=0;
+         
+    for (int idx=0; idx<nrsamples)
+        setOutputValue( output, 0, idx, z0, Output[idx] );
+            
     return true;
 }
 
