@@ -80,6 +80,9 @@ AVOPolarAttrib::AVOPolarAttrib( Desc& desc )
     gate_.scale( 1.f/zFactor() );
     mGetBinID( stepoutBG_, soBGStr() )
 
+    samplegateBG_ = Interval<int>( mNINT32(gateBG_.start/refstep_), mNINT32(gateBG_.stop/refstep_) );
+    samplegate_ = Interval<int>( mNINT32(gate_.start/refstep_), mNINT32(gate_.stop/refstep_) );
+
     getTrcPos();
 }
 
@@ -146,37 +149,86 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
     if ( interceptdata_.isEmpty() || gradientdata_.isEmpty() || output.isEmpty() )
         return false;
 
-    const Interval<int> samplegateBG( mNINT32(gateBG_.start/refstep_), mNINT32(gateBG_.stop/refstep_) );
-    const Interval<int> samplegate( mNINT32(gate_.start/refstep_), mNINT32(gate_.stop/refstep_) );
-
-    const int gateBGsz = samplegateBG.width() + 1;
-    const int gatesz = samplegate.width() + 1;
-    
     const int ntraces = trcpos_.size();
-    const int sz = samplegateBG.width() + nrsamples;
-    Array1DImpl<float> AxB(sz), A2(sz), B2(sz);
-    Array1DImpl<float> Output(nrsamples);
-/*
-    for (int it=0; it<ntraces; it++) {
-        const DataHolder* dataA = interceptdata_[it];
-        const DataHolder* dataB = gradientdata_[it];
-        for ( int idx=0; idx<sz; idx++ ) {
-            float Aval = getInputValue(*dataA, interceptdataidx_, idx, z0);
-            float Bval = getInputValue(*dataB, gradientdataidx_,idx, z0);
-            AxB[idx] += Aval*Bval;
-            A2[idx] += Aval*Aval;
-            B2[idx] += Bval*Bval;
+    const int sz = samplegateBG_.width() + nrsamples;
+    
+    Array2DImpl<float> A(ntraces, sz), B(ntraces, sz);
+    
+    for (int trcidx=0; trcidx<ntraces; trc++) {
+        const DataHolder* dataA = interceptdata_[trcidx];
+        const DataHolder* dataB = gradientdata_[trcidx];
+        for (int idx=0; idx<sz; idx++) {
+            float val = getInputValue(*dataA, interceptdataidx_, samplegateBG_.start+idx, z0);
+            A.set(trcidx, idx, mIsUdf(val)?0.0f:val);
+            val = getInputValue(*dataB, gradientdataidx_, samplegateBG_.start+idx, z0);
+            B.set(trcidx, idx, mIsUdf(val)?0.0f:val);
         }
     }
-*/
-    for (int idx=0;
-         
-    for (int idx=0; idx<nrsamples)
-        setOutputValue( output, 0, idx, z0, Output[idx] );
-            
+
+    Array1DImpl<float> bgAngle(0);
+    Array1DImpl<float> locAngle(0);
+    
+    if (isOutputEnabled(OutputType::BackgroundAngle)) {
+        bgAngle.setSize(nrsamples);
+        computeBackgroundAngle(A, B, bgAngle);
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::BackgroundAngle, idx, z0, bgAngle[idx]);
+    }
+    
+    if (isOutputEnabled(OutputType::LocalAngle)) {
+        locAngle.setSize(nrsamples);
+        computeLocalAngle(A, B, locAngle);
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::LocalAngle, idx, z0, locAngle[idx]);
+    }
+    
+    if (isOutputEnabled(OutputType::AngleDifference)) {
+        computeAngleDifference();
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::AngleDifference, idx, z0, RESULT[idx]);
+    }
+    
+    if (isOutputEnabled(OutputType::Strength)) {
+        computeStrength();
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::Strength, idx, z0, RESULT[idx]);
+    }
+    
+    if (isOutputEnabled(OutputType::PolarizationProduct)) {
+        computePolarizationProduct();
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::PolarizationProduct, idx, z0, RESULT[idx]);
+    }
+    
+    if (isOutputEnabled(OutputType::Quality)) {
+        computeQuality();
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::Quality, idx, z0, RESULT[idx]);
+    }
+
+    if (isOutputEnabled(OutputType::BackgroundQuality)) {
+        computeBackgroundQuality();
+        for (int idx=0; idx<nrsamples; idx++)
+            setOutputValue(output,OutputType::BackgroundQuality, idx, z0, RESULT[idx]);
+    }
+    
     return true;
 }
 
-
+void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle )
+{
+    int ntraces = A.info.getSize(0);
+    int sz = A.info.getSize(1);
+    Array1DImpl<double> A2(sz);
+    A2.setAll(0.0);
+    
+    for (int idx=0; idx<sz; idx++) {
+        double A2v = 0.0
+        for (int trcidx=0; trcidx<ntraces; trcidx++) {
+            A2v += A.get(trcidx, idx);
+        }
+        A2[idx] = A2v;
+    }
+}
 } // namespace Attrib
 

@@ -68,6 +68,8 @@ protected:
     BinID               stepoutBG_;
     Interval<float>     gateBG_;
     Interval<float>     gate_;
+    Interval<int>       samplegateBG_;
+    Interval<int>       samplegate_;
     TypeSet<BinID>      trcpos_;
     int                 centertrcidx_;
     int                 outtype_;
