@@ -172,47 +172,63 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
         bgAngle.setSize(nrsamples);
         computeBackgroundAngle(A, B, bgAngle);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::BackgroundAngle, idx, z0, bgAngle[idx]);
+            setOutputValue(output,OutputType::BackgroundAngle, idx, z0, bgAngle[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::LocalAngle)) {
         locAngle.setSize(nrsamples);
         computeLocalAngle(A, B, locAngle);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::LocalAngle, idx, z0, locAngle[idx]);
+            setOutputValue(output,OutputType::LocalAngle, idx, z0, locAngle[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::AngleDifference)) {
         computeAngleDifference();
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::AngleDifference, idx, z0, RESULT[idx]);
+            setOutputValue(output,OutputType::AngleDifference, idx, z0, RESULT[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::Strength)) {
         computeStrength();
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::Strength, idx, z0, RESULT[idx]);
+            setOutputValue(output,OutputType::Strength, idx, z0, RESULT[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::PolarizationProduct)) {
         computePolarizationProduct();
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::PolarizationProduct, idx, z0, RESULT[idx]);
+            setOutputValue(output,OutputType::PolarizationProduct, idx, z0, RESULT[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::Quality)) {
         computeQuality();
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::Quality, idx, z0, RESULT[idx]);
+            setOutputValue(output,OutputType::Quality, idx, z0, RESULT[idx-samplegateBG_.start]);
     }
 
     if (isOutputEnabled(OutputType::BackgroundQuality)) {
         computeBackgroundQuality();
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::BackgroundQuality, idx, z0, RESULT[idx]);
+            setOutputValue(output,OutputType::BackgroundQuality, idx, z0, RESULT[idx-samplegateBG_.start]);
     }
     
     return true;
+}
+
+void AVOPolarAttrib::computePolarAngle( const Array1DImpl<double>& A2, const Array1DImpl<double>& B2, const Array1DImpl<double>& AB, Array1DImpl<float>& polarAngle )
+{
+    int sz = A2.info.getSize();
+    int nrsamples = sz - samplegateBG_.width();
+    polarAngle.setAll(0.0);
+    
+    double a2 = 0.0;
+    double ab = 0.0;
+    double b2 = 0.0;
+    for (idx=0; idx<samplegateBG_.width(); idx++) {
+        a2 += A2[idx];
+        ab += AB[idx];
+        b2 += B2[idx];
+    }
 }
 
 void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle )
@@ -221,14 +237,66 @@ void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const 
     int sz = A.info.getSize(1);
     Array1DImpl<double> A2(sz);
     A2.setAll(0.0);
+    Array1DImpl<double> B2(sz);
+    B2.setAll(0.0);
+    Array1DImpl<double> AB(sz);
+    AB.setAll(0.0);
     
     for (int idx=0; idx<sz; idx++) {
-        double A2v = 0.0
+        double A2v = 0.0;
+        double ABv = 0.0;
+        double B2v = 0.0;
         for (int trcidx=0; trcidx<ntraces; trcidx++) {
-            A2v += A.get(trcidx, idx);
+            A2v += A.get(trcidx, idx) * A.get(trcidx, idx);
+            ABv += A.get(trcidx, idx) * B.get(trcidx, idx);
+            B2v += B.get(trcidx, idx) * B.get(trcidx, idx);
         }
         A2[idx] = A2v;
+        B2[idx] = B2v;
+        AB[idx] = ABv;
+    }
+    
+    int nrsamples = sz - samplegateBG_.width();
+    bgAngle.setAll(0.0);
+    double A2v = 0.0;
+    double ABv = 0.0;
+    double B2v = 0.0;
+    for (int idx=0; idx<nrsamples; idx++) {
+        if (idx==0) {
+            for (int i=0; i<samplegateBG_.width(); i++) {
+                A2v += A2[i];
+                ABv += AB[i];
+                B2v += B2[i];
+            }
+        } else {
+            int isub = idx-1;
+            int iadd = idx + samplegateBG_.width(); 
+            A2v += A2[iadd] - A2[isub];
+            B2v += B2[iadd] - B2[isub];
+            ABv += AB[iadd] - AB[isub];
+        }
+        
+        double A2mB2 = A2v - B2v;
+        double d = sqrt(4.0*ABv*ABv + A2mB2*A2mB2);
+        bgAngle[idx] = atan2(2.0*ABv, A2mB2+d);
     }
 }
-} // namespace Attrib
+
+void AVOPolarAttrib::computeLocalAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& locAngle )
+{
+    int sz = A.info.getSize(1);
+    Array1DImpl<double> A2(sz);
+    A2.setAll(0.0);
+    Array1DImpl<double> B2(sz);
+    B2.setAll(0.0);
+    Array1DImpl<double> AB(sz);
+    AB.setAll(0.0);
+    for (int idx=0; idx<sz; idx++) {
+        A2[idx] = A.get(centertrcidx_, idx) * A.get(centertrcidx_, idx);
+        B2[idx] = B.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
+        AB[idx] = A.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
+    }
+}
+
+// namespace Attrib
 
