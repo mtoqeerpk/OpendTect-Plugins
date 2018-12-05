@@ -215,22 +215,6 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
     return true;
 }
 
-void AVOPolarAttrib::computePolarAngle( const Array1DImpl<double>& A2, const Array1DImpl<double>& B2, const Array1DImpl<double>& AB, Array1DImpl<float>& polarAngle )
-{
-    int sz = A2.info.getSize();
-    int nrsamples = sz - samplegateBG_.width();
-    polarAngle.setAll(0.0);
-    
-    double a2 = 0.0;
-    double ab = 0.0;
-    double b2 = 0.0;
-    for (idx=0; idx<samplegateBG_.width(); idx++) {
-        a2 += A2[idx];
-        ab += AB[idx];
-        b2 += B2[idx];
-    }
-}
-
 void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle )
 {
     int ntraces = A.info.getSize(0);
@@ -296,6 +280,91 @@ void AVOPolarAttrib::computeLocalAngle( const Array2DImpl<float>& A, const Array
         B2[idx] = B.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
         AB[idx] = A.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
     }
+    
+    int nrsamples = sz - samplegateBG_.width();
+    locAngle.setAll(0.0);
+    double A2v = 0.0;
+    double B2v = 0.0;
+    double ABv = 0.0;
+    for (int idx=-samplegateBG_.start; idx<nrsamples-samplegateBG_.start; idx++) {
+        if (idx == -samplegateBG_.start) {
+            for (int i=samplegate_.start+idx; i<samplegate_.stop+idx; i++) {
+                A2v += A2[i];
+                B2v += A2[i];
+                ABv += A2[i];
+            }
+        } else {
+            int isub = idx + samplegate_.start - 1;
+            int iadd - idx + samplegate_.stop;
+            A2v += A2[iadd] - A2[isub];
+            B2v += B2[iadd] - B2[isub];
+            ABv += AB[iadd] - AB[isub];
+        }
+        
+        double A2mB2 = A2v - B2v;
+        double d = sqrt(4.0*ABv*ABv + A2mB2*A2mB2);
+        locAngle[idx] = atan2(2.0*ABv, A2mB2+d);
+    }
+}
+
+void AVOPolarAttrib::computeStrength( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& strength )
+{
+    
+    int minIdx = 0;
+    int maxIdx = 0;
+    float minVal = A.get(centertrcidx_, 0);
+    float maxVal = min;
+    for (int idx=0; idx<sz; idx++) {
+        float Aval = A.get(centertrcidx_, idx);
+        minIdx = (Aval<minVal)? idx : minIdx;
+        maxIdx = (Aval>maxVal)? idx : maxIdx;
+        minVal = (Aval<minVal)? Aval : minVal;
+        maxVal = (Aval>maxVal)? Aval : maxVal;
+    }
+
+    int sz = A.info.getSize(1);
+    int nrsamples = sz - samplegateBG_.width();
+    strength.setAll(0.0);
+   for (int idx=0; idx<nrsamples; idx++) {
+        if (idx==0) {
+            for (int i=0; i<samplegate_.width(); i++) {
+                float Aval = A.get(centertrcidx_, i);
+                minIdx = (Aval<minVal)? i : minIdx;
+                maxIdx = (Aval>maxVal)? i : maxIdx;
+                minVal = (Aval<minVal)? Aval : minVal;
+                maxVal = (Aval>maxVal)? Aval : maxVal;
+            }
+        } else {
+            if (minIdx == idx-1) {
+                for (int i=0; i<samplegate_.width(); i++) {
+                    float Aval = A.get(centertrcidx_, i+idx);
+                    minIdx = (Aval<minVal)? i+idx : minIdx;
+                    minVal = (Aval<minVal)? Aval : minVal;
+                }
+            }
+            if (maxIdx == idx-1) {
+                for (int i=0; i<samplegate_.width(); i++) {
+                    float Aval = A.get(centertrcidx_, i+idx);
+                    maxIdx = (Aval>maxVal)? i+idx : maxIdx;
+                    maxVal = (Aval>maxVal)? Aval : maxVal;
+                }
+            }
+            float Aval = A.get(centertrcidx_, idx+samplegate_.width());
+            if (Aval<minVal) {
+                minIdx = idx+samplegate_.width();
+                minVal = Aval;
+            }
+            if (Aval>maxVal) {
+                maxIdx = idx+samplegate_.width();
+                maxVal = Aval;
+            }
+        }
+        float Amin = A.get(minIdx);
+        float Bmin = B.get(minIdx);
+        float Amax = A.get(maxIdx);
+        float Bmax = B.get(maxIdx); 
+        strength.set( idx, sqrt(Amin*Amin+Bmin+Bmin)+sqrt(Amax*Amax+Bmax*Bmax));
+        }
 }
 
 // namespace Attrib
