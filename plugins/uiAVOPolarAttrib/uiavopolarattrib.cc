@@ -37,7 +37,6 @@ static const char* outputstr[] =
     "Strength",
     "Polarization Product",
     "Quality",
-    "Background Quality",
     0
 };
 

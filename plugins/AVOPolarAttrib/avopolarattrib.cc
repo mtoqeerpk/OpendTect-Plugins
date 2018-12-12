@@ -25,7 +25,7 @@
 #include "attribparam.h"
 #include "arrayndimpl.h"
 
-#include "math2.h"
+#include "windowedOps.h"
 
 
 namespace Attrib
@@ -37,15 +37,14 @@ void AVOPolarAttrib::initClass()
 {
 	mAttrStartInitClassWithUpdate
 
-    EnumParam* output = new EnumParam( outputStr() );
-    output->addEnum( "Background Angle" );
-    output->addEnum( "Local Angle" );
-    output->addEnum( "Angle Difference" );
-    output->addEnum( "Strength" );
-    output->addEnum( "Polarization Product" );
-    output->addEnum( "Quality" );
-    output->addEnum( "Background Quality" );
-    desc->addParam( output );
+//    EnumParam* output = new EnumParam( outputStr() );
+//    output->addEnum( "Background Angle" );
+//    output->addEnum( "Local Angle" );
+//    output->addEnum( "Angle Difference" );
+//    output->addEnum( "Strength" );
+//    output->addEnum( "Polarization Product" );
+//    output->addEnum( "Quality" );
+//    desc->addParam( output );
     
     ZGateParam* gateBG = new ZGateParam( gateBGStr() );
     gateBG->setLimits( Interval<float>(-1000,1000) );
@@ -56,16 +55,16 @@ void AVOPolarAttrib::initClass()
     stepout->setDefaultValue( BinID(1,1) );
     desc->addParam( stepout );
     
-    desc->addOutputDataType( Seis::UnknowData );
     desc->addInput( InputSpec("Intercept cube",true) );
     desc->addInput( InputSpec("Gradient cube",true) );
 
+    desc->setNrOutputs( Seis::UnknowData, 6 );
     mAttrEndInitClass
 }
 
 void AVOPolarAttrib::updateDesc( Desc& desc )
 {
-    BufferString output = desc.getValParam( outputStr() )->getStringValue();
+//    BufferString output = desc.getValParam( outputStr() )->getStringValue();
 }
 
 AVOPolarAttrib::AVOPolarAttrib( Desc& desc )
@@ -73,12 +72,12 @@ AVOPolarAttrib::AVOPolarAttrib( Desc& desc )
 {
     if ( !isOK() ) return;
 
-    mGetEnum( output_, outputStr() );
+//    mGetEnum( output_, outputStr() );
     mGetFloatInterval( gateBG_, gateBGStr() );
     gateBG_.scale( 1.f/zFactor() );
     mGetFloatInterval( gate_, gateStr() );
     gate_.scale( 1.f/zFactor() );
-    mGetBinID( stepoutBG_, soBGStr() )
+    mGetBinID( stepoutBG_, soBGStr() );
 
     samplegateBG_ = Interval<int>( mNINT32(gateBG_.start/refstep_), mNINT32(gateBG_.stop/refstep_) );
     samplegate_ = Interval<int>( mNINT32(gate_.start/refstep_), mNINT32(gate_.stop/refstep_) );
@@ -92,9 +91,9 @@ bool AVOPolarAttrib::getTrcPos()
     BinID bid;
     int trcidx = 0;
     centertrcidx_ = 0;
-    for ( bid.inl()=-stepout_.inl(); bid.inl()<=stepout_.inl(); bid.inl()++ )
+    for ( bid.inl()=-stepoutBG_.inl(); bid.inl()<=stepoutBG_.inl(); bid.inl()++ )
     {
-        for ( bid.crl()=-stepout_.crl(); bid.crl()<=stepout_.crl(); bid.crl()++ )
+        for ( bid.crl()=-stepoutBG_.crl(); bid.crl()<=stepoutBG_.crl(); bid.crl()++ )
         {
             if ( !bid.inl() && !bid.crl() )
                 centertrcidx_ = trcidx;
@@ -125,13 +124,12 @@ bool AVOPolarAttrib::getInputData( const BinID& relpos, int zintv )
         interceptdata_.replace( idx, data );
     }
 
-    bidstep = inputs_[1]->getStepoutStep();
     for ( int idx=0; idx<trcpos_.size(); idx++ )
     {
         const DataHolder* data = inputs_[1]->getData( relpos+trcpos_[idx]*bidstep, zintv );
         if ( !data ) {
             const BinID pos = relpos + trcpos_[centertrcidx_]*bidstep;
-            data = inputs_[0]->getData( pos, zintv );
+            data = inputs_[1]->getData( pos, zintv );
             if ( !data ) return false;
         }
         gradientdata_.replace( idx, data );
@@ -154,7 +152,7 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
     
     Array2DImpl<float> A(ntraces, sz), B(ntraces, sz);
     
-    for (int trcidx=0; trcidx<ntraces; trc++) {
+    for (int trcidx=0; trcidx<ntraces; trcidx++) {
         const DataHolder* dataA = interceptdata_[trcidx];
         const DataHolder* dataB = gradientdata_[trcidx];
         for (int idx=0; idx<sz; idx++) {
@@ -167,63 +165,76 @@ bool AVOPolarAttrib::computeData( const DataHolder& output, const BinID& relpos,
 
     Array1DImpl<float> bgAngle(0);
     Array1DImpl<float> locAngle(0);
+    Array1DImpl<float> correlationCoef(0);
+    Array1DImpl<float> angleDiff(0);
+    Array1DImpl<float> strength(0);
     
     if (isOutputEnabled(OutputType::BackgroundAngle)) {
-        bgAngle.setSize(nrsamples);
         computeBackgroundAngle(A, B, bgAngle);
         for (int idx=0; idx<nrsamples; idx++)
             setOutputValue(output,OutputType::BackgroundAngle, idx, z0, bgAngle[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::LocalAngle)) {
-        locAngle.setSize(nrsamples);
-        computeLocalAngle(A, B, locAngle);
+        computeLocalAngle(A, B, locAngle, correlationCoef);
         for (int idx=0; idx<nrsamples; idx++)
             setOutputValue(output,OutputType::LocalAngle, idx, z0, locAngle[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::AngleDifference)) {
-        computeAngleDifference();
+        if (bgAngle.info().getSize(0) == 0)
+            computeBackgroundAngle(A, B, bgAngle);
+        if (locAngle.info().getSize(0) == 0)
+            computeLocalAngle(A, B, locAngle, correlationCoef);
+        computeAngleDifference(bgAngle, locAngle, angleDiff);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::AngleDifference, idx, z0, RESULT[idx-samplegateBG_.start]);
+            setOutputValue(output,OutputType::AngleDifference, idx, z0, angleDiff[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::Strength)) {
-        computeStrength();
+        computeStrength( A, B, strength);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::Strength, idx, z0, RESULT[idx-samplegateBG_.start]);
+            setOutputValue(output,OutputType::Strength, idx, z0, strength[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::PolarizationProduct)) {
-        computePolarizationProduct();
+        if (strength.info().getSize(0) == 0)
+            computeStrength( A, B, strength );
+        if (angleDiff.info().getSize(0) == 0) {
+            if (bgAngle.info().getSize(0) == 0)
+                computeBackgroundAngle(A, B, bgAngle);
+            if (locAngle.info().getSize(0) == 0)
+                computeLocalAngle(A, B, locAngle, correlationCoef);
+            computeAngleDifference(bgAngle, locAngle, angleDiff);
+        }
+        Array1DImpl<float> polProd(0);
+        computePolarizationProduct(angleDiff, strength, polProd);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::PolarizationProduct, idx, z0, RESULT[idx-samplegateBG_.start]);
+            setOutputValue(output,OutputType::PolarizationProduct, idx, z0, polProd[idx-samplegateBG_.start]);
     }
     
     if (isOutputEnabled(OutputType::Quality)) {
-        computeQuality();
+        if (correlationCoef.info().getSize(0) == 0)
+            computeLocalAngle(A, B, locAngle, correlationCoef);
         for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::Quality, idx, z0, RESULT[idx-samplegateBG_.start]);
+            setOutputValue(output,OutputType::Quality, idx, z0, correlationCoef[idx-samplegateBG_.start]);
     }
 
-    if (isOutputEnabled(OutputType::BackgroundQuality)) {
-        computeBackgroundQuality();
-        for (int idx=0; idx<nrsamples; idx++)
-            setOutputValue(output,OutputType::BackgroundQuality, idx, z0, RESULT[idx-samplegateBG_.start]);
-    }
     
     return true;
 }
 
-void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle )
+void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle ) const
 {
-    int ntraces = A.info.getSize(0);
-    int sz = A.info.getSize(1);
-    Array1DImpl<double> A2(sz);
+    int ntraces = A.info().getSize(0);
+    int sz = A.info().getSize(1);
+    bgAngle.setSize(sz);
+    
+    Array1DImpl<float> A2(sz);
     A2.setAll(0.0);
-    Array1DImpl<double> B2(sz);
+    Array1DImpl<float> B2(sz);
     B2.setAll(0.0);
-    Array1DImpl<double> AB(sz);
+    Array1DImpl<float> AB(sz);
     AB.setAll(0.0);
     
     for (int idx=0; idx<sz; idx++) {
@@ -235,136 +246,105 @@ void AVOPolarAttrib::computeBackgroundAngle( const Array2DImpl<float>& A, const 
             ABv += A.get(trcidx, idx) * B.get(trcidx, idx);
             B2v += B.get(trcidx, idx) * B.get(trcidx, idx);
         }
-        A2[idx] = A2v;
-        B2[idx] = B2v;
-        AB[idx] = ABv;
+        A2.set(idx, A2v);
+        B2.set(idx, B2v);
+        AB.set(idx, ABv);
     }
     
-    int nrsamples = sz - samplegateBG_.width();
-    bgAngle.setAll(0.0);
-    double A2v = 0.0;
-    double ABv = 0.0;
-    double B2v = 0.0;
-    for (int idx=0; idx<nrsamples; idx++) {
-        if (idx==0) {
-            for (int i=0; i<samplegateBG_.width(); i++) {
-                A2v += A2[i];
-                ABv += AB[i];
-                B2v += B2[i];
-            }
-        } else {
-            int isub = idx-1;
-            int iadd = idx + samplegateBG_.width(); 
-            A2v += A2[iadd] - A2[isub];
-            B2v += B2[iadd] - B2[isub];
-            ABv += AB[iadd] - AB[isub];
-        }
-        
-        double A2mB2 = A2v - B2v;
+    Array1DImpl<float> A2win(sz);
+    windowedOps::sum( A2, samplegateBG_.width(), A2win );
+    Array1DImpl<float> B2win(sz);
+    windowedOps::sum( B2, samplegateBG_.width(), B2win );
+    Array1DImpl<float> ABwin(sz);
+    windowedOps::sum( AB, samplegateBG_.width(), ABwin );
+    
+    for (int idx=0; idx<sz; idx++) {
+        double ABv = ABwin.get(idx);
+        double A2mB2 = A2win.get(idx) - B2win.get(idx);
         double d = sqrt(4.0*ABv*ABv + A2mB2*A2mB2);
-        bgAngle[idx] = atan2(2.0*ABv, A2mB2+d);
+        bgAngle.set(idx, atan2(2.0*ABv, A2mB2+d));
     }
 }
-
-void AVOPolarAttrib::computeLocalAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& locAngle )
+        
+void AVOPolarAttrib::computeLocalAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& locAngle, Array1DImpl<float>& coeff ) const
 {
-    int sz = A.info.getSize(1);
-    Array1DImpl<double> A2(sz);
+    int sz = A.info().getSize(1);
+    locAngle.setSize(sz);
+    coeff.setSize(sz);
+
+    Array1DImpl<float> A2(sz);
     A2.setAll(0.0);
-    Array1DImpl<double> B2(sz);
+    Array1DImpl<float> B2(sz);
     B2.setAll(0.0);
-    Array1DImpl<double> AB(sz);
+    Array1DImpl<float> AB(sz);
     AB.setAll(0.0);
     for (int idx=0; idx<sz; idx++) {
-        A2[idx] = A.get(centertrcidx_, idx) * A.get(centertrcidx_, idx);
-        B2[idx] = B.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
-        AB[idx] = A.get(centertrcidx_, idx) * B.get(centertrcidx_, idx);
+        A2.set(idx, A.get(centertrcidx_, idx) * A.get(centertrcidx_, idx));
+        B2.set(idx, B.get(centertrcidx_, idx) * B.get(centertrcidx_, idx));
+        AB.set(idx, A.get(centertrcidx_, idx) * B.get(centertrcidx_, idx));
     }
     
-    int nrsamples = sz - samplegateBG_.width();
-    locAngle.setAll(0.0);
-    double A2v = 0.0;
-    double B2v = 0.0;
-    double ABv = 0.0;
-    for (int idx=-samplegateBG_.start; idx<nrsamples-samplegateBG_.start; idx++) {
-        if (idx == -samplegateBG_.start) {
-            for (int i=samplegate_.start+idx; i<samplegate_.stop+idx; i++) {
-                A2v += A2[i];
-                B2v += A2[i];
-                ABv += A2[i];
-            }
-        } else {
-            int isub = idx + samplegate_.start - 1;
-            int iadd - idx + samplegate_.stop;
-            A2v += A2[iadd] - A2[isub];
-            B2v += B2[iadd] - B2[isub];
-            ABv += AB[iadd] - AB[isub];
-        }
-        
-        double A2mB2 = A2v - B2v;
+    Array1DImpl<float> A2win(sz);
+    windowedOps::sum( A2, samplegate_.width(), A2win );
+    Array1DImpl<float> B2win(sz);
+    windowedOps::sum( B2, samplegate_.width(), B2win );
+    Array1DImpl<float> ABwin(sz);
+    windowedOps::sum( AB, samplegate_.width(), ABwin );
+    
+    for (int idx=0; idx<sz; idx++) {
+        double ABv = ABwin.get(idx);
+        double A2mB2 = A2win.get(idx) - B2win.get(idx);
         double d = sqrt(4.0*ABv*ABv + A2mB2*A2mB2);
-        locAngle[idx] = atan2(2.0*ABv, A2mB2+d);
+        locAngle.set(idx, atan2(2.0*ABv, A2mB2+d));
+        coeff.set(idx, ABv / (sqrt(A2win.get(idx)) * sqrt(B2win.get(idx))));
     }
 }
 
-void AVOPolarAttrib::computeStrength( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& strength )
+void AVOPolarAttrib::computeAngleDifference( const Array1DImpl<float>& bgAngle, const Array1DImpl<float>& locAngle, Array1DImpl<float>& diff ) const
 {
-    
-    int minIdx = 0;
-    int maxIdx = 0;
-    float minVal = A.get(centertrcidx_, 0);
-    float maxVal = min;
-    for (int idx=0; idx<sz; idx++) {
-        float Aval = A.get(centertrcidx_, idx);
-        minIdx = (Aval<minVal)? idx : minIdx;
-        maxIdx = (Aval>maxVal)? idx : maxIdx;
-        minVal = (Aval<minVal)? Aval : minVal;
-        maxVal = (Aval>maxVal)? Aval : maxVal;
-    }
+    int sz = bgAngle.info().getSize(0);
+    diff.setSize(sz);
+    for (int idx=0; idx<sz; idx++)
+        diff.set(idx, locAngle.get(idx)-bgAngle.get(idx));
+}
 
-    int sz = A.info.getSize(1);
-    int nrsamples = sz - samplegateBG_.width();
-    strength.setAll(0.0);
-   for (int idx=0; idx<nrsamples; idx++) {
-        if (idx==0) {
-            for (int i=0; i<samplegate_.width(); i++) {
-                float Aval = A.get(centertrcidx_, i);
-                minIdx = (Aval<minVal)? i : minIdx;
-                maxIdx = (Aval>maxVal)? i : maxIdx;
-                minVal = (Aval<minVal)? Aval : minVal;
-                maxVal = (Aval>maxVal)? Aval : maxVal;
-            }
-        } else {
-            if (minIdx == idx-1) {
-                for (int i=0; i<samplegate_.width(); i++) {
-                    float Aval = A.get(centertrcidx_, i+idx);
-                    minIdx = (Aval<minVal)? i+idx : minIdx;
-                    minVal = (Aval<minVal)? Aval : minVal;
-                }
-            }
-            if (maxIdx == idx-1) {
-                for (int i=0; i<samplegate_.width(); i++) {
-                    float Aval = A.get(centertrcidx_, i+idx);
-                    maxIdx = (Aval>maxVal)? i+idx : maxIdx;
-                    maxVal = (Aval>maxVal)? Aval : maxVal;
-                }
-            }
-            float Aval = A.get(centertrcidx_, idx+samplegate_.width());
-            if (Aval<minVal) {
-                minIdx = idx+samplegate_.width();
-                minVal = Aval;
-            }
-            if (Aval>maxVal) {
-                maxIdx = idx+samplegate_.width();
-                maxVal = Aval;
-            }
-        }
-        float Amin = A.get(minIdx);
-        float Bmin = B.get(minIdx);
-        float Amax = A.get(maxIdx);
-        float Bmax = B.get(maxIdx); 
-        strength.set( idx, sqrt(Amin*Amin+Bmin+Bmin)+sqrt(Amax*Amax+Bmax*Bmax));
-        }
+void AVOPolarAttrib::computeStrength( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& strength ) const
+{
+    int sz = A.info().getSize(1);
+    strength.setSize(sz);
+
+    Array1DImpl<float> Ac(sz);
+    Array1DImpl<float> Bc(sz);
+    for (int idx=0; idx<sz; idx++) {
+        Ac.set(idx, A.get(centertrcidx_, idx));
+        Bc.set(idx, B.get(centertrcidx_, idx));
+    }
+    
+    Array1DImpl<int> Amin(sz);
+    windowedOps::minIdx( Ac, samplegate_.width(), Amin );
+    Array1DImpl<int> Amax(sz);
+    windowedOps::maxIdx( Ac, samplegate_.width(), Amax );
+    
+    for (int idx=0; idx<sz; idx++) {
+        int imin = Amin.get(idx);
+        int imax = Amin.get(idx);
+        double Amn = Ac.get(imin);
+        double Bmn = Bc.get(imin);
+        double Amx = Ac.get(imax);
+        double Bmx = Bc.get(imax);
+        strength.set(idx, sqrt(Amn*Amn+Bmn*Bmn) + sqrt(Amx*Amx+Bmx*Bmx));
+    }    
+}
+
+void AVOPolarAttrib::computePolarizationProduct( const Array1DImpl<float>& angleDiff, const Array1DImpl<float>& strength, Array1DImpl<float>& polProd ) const
+{
+    int sz = angleDiff.info().getSize(0);
+    polProd.setSize(sz);
+
+    for (int idx=0; idx<sz; idx++) {
+        polProd.set(idx, angleDiff.get(idx)*strength.get(idx));
+    }    
+}
 }
 
 // namespace Attrib

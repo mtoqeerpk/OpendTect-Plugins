@@ -23,7 +23,7 @@ ________________________________________________________________________
 
 #include "avopolarattribmod.h"
 #include "attribprovider.h"
-
+#include "arrayndimpl.h"
 
 /*!\brief AVO Polarization Attribute
 
@@ -42,26 +42,34 @@ public:
                         AVOPolarAttrib(Desc&);
 
     static const char*  attribName()    { return "AVOPolarAttrib"; }
-    static const char*	outputStr()     { return "output"; }
+//    static const char*	outputStr()     { return "output"; }
     static const char*  gateBGStr()     { return "gateBG"; }
     static const char*  soBGStr()       { return "soBG"; }
     static const char*  gateStr()       { return "gate"; }
 
-    enum OutputType { BackgroundAngle, LocalAngle, AngleDifference, Strength, PolarizationProduct, Quality, BackgroundQuality };
+    enum OutputType { BackgroundAngle, LocalAngle, AngleDifference, Strength, PolarizationProduct, Quality };
 
     
 protected:
                         ~AVOPolarAttrib();
     static Provider*    createInstance(Desc&);
+    static void			updateDesc(Desc&);
+
 
     bool                allowParallelComputation() const { return false; }
 
     bool                getInputData(const BinID&,int zintv);
     bool                computeData(const DataHolder&, const BinID& relpos, int z0, int nrsamples, int threadid) const;
+    
+    void                computeBackgroundAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& bgAngle ) const;
+    void                computeLocalAngle( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& locAngle, Array1DImpl<float>& coeff ) const;
+    void                computeAngleDifference( const Array1DImpl<float>& bgAngle, const Array1DImpl<float>& locAngle, Array1DImpl<float>& diff ) const;
+    void                computeStrength( const Array2DImpl<float>& A, const Array2DImpl<float>& B, Array1DImpl<float>& strength ) const;
+    void                computePolarizationProduct( const Array1DImpl<float>& angleDiff, const Array1DImpl<float>& strength, Array1DImpl<float>& polProd ) const;
 
     const BinID*        desStepout(int input,int output) const;
     const Interval<int>*    desZSampMargin(int input,int output) const
-                            { return &zmargin_; }
+                            { return &samplegateBG_; }
 
     bool                getTrcPos();
 
