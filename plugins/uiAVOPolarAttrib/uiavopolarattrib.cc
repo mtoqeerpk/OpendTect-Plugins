@@ -24,6 +24,7 @@ ________________________________________________________________________
 #include "attribdesc.h"
 #include "attribparam.h"
 #include "uiattribfactory.h"
+#include "uistepoutsel.h"
 #include "uiattrsel.h"
 #include "uigeninput.h"
 
@@ -59,13 +60,13 @@ uiAVOPolarAttrib::uiAVOPolarAttrib( uiParent* p, bool is2d )
     gateBGfld_->attach( alignedBelow, outputfld_ );
 
     stepoutBGfld_ = new uiStepOutSel( this, is2d );
-    stepoutBGfld_->attach( rightTo, zmarginBGfld_ );
+    stepoutBGfld_->attach( rightTo, gateBGfld_ );
     stepoutBGfld_->setFieldNames( is2d ? "Trace Nr Stepout" : "Inl Stepout", "Crl Stepout" );
 
     gatefld_ = new uiGenInput( this, zDepLabel(tr("Local "), tr("gate")), FloatInpIntervalSpec().setName("Z start",0).setName("Z stop",1));
     gatefld_->attach( alignedBelow, gateBGfld_ );
     
-    setHAlignObj( outfld_ );
+    setHAlignObj( outputfld_ );
 }
 
 bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
@@ -73,9 +74,9 @@ bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
     if ( desc.attribName() != AVOPolarAttrib::attribName() )
 	return false;
 
-    mIfGetEnum(AVOPolarAttrib::outputStr(),output, outfld_->setValue(output) )
+    mIfGetEnum(AVOPolarAttrib::outputStr(),output, outputfld_->setValue(output) )
     mIfGetFloatInterval(AVOPolarAttrib::gateBGStr(), gateBG, gateBGfld_->setValue(gateBG))
-    mIfGetBinID(AVOPolarAttrib::stepoutBGStr(),soBG,stepoutBGfld_->setBinID(soBG))
+    mIfGetBinID(AVOPolarAttrib::soBGStr(),soBG,stepoutBGfld_->setBinID(soBG))
     mIfGetFloatInterval(AVOPolarAttrib::gateStr(), gate, gatefld_->setValue(gate))
     
     return true;
@@ -95,8 +96,8 @@ bool uiAVOPolarAttrib::getParameters( Attrib::Desc& desc )
     if ( desc.attribName() != AVOPolarAttrib::attribName() )
         return false;
 
-    mSetEnum( AVOPolarAttrib::outputStr(), outfld_->getIntValue() );
-    mSetBinID( AVOPolarAttrib::stepoutBGStr(), stepoutBGfld_->getBinID() );
+    mSetEnum( AVOPolarAttrib::outputStr(), outputfld_->getIntValue() );
+    mSetBinID( AVOPolarAttrib::soBGStr(), stepoutBGfld_->getBinID() );
     mSetFloatInterval( AVOPolarAttrib::gateBGStr(), gateBGfld_->getFInterval() );
     mSetFloatInterval( AVOPolarAttrib::gateStr(), gatefld_->getFInterval() );
 

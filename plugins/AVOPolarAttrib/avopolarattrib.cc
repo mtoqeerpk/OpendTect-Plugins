@@ -21,6 +21,7 @@
 #include "avopolarattrib.h"
 #include "attribdataholder.h"
 #include "attribdesc.h"
+#include "attribdescset.h"
 #include "attribfactory.h"
 #include "attribparam.h"
 #include "arrayndimpl.h"
