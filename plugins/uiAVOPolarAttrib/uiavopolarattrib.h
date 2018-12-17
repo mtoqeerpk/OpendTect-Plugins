@@ -26,6 +26,7 @@ ________________________________________________________________________
 
 class uiAttrSel;
 class uiGenInput;
+class uiStepOutSel;
 
 
 /*! \brief Compute AVO Polarization, Strength and other related attributes description editor */
@@ -42,13 +43,15 @@ protected:
     uiAttrSel*		inp_gradientfld_;
     uiGenInput*		outputfld_;
     uiGenInput*     gateBGfld_;
-    uiGenInput*     stepoutBGfld_;
+    uiStepOutSel*   stepoutBGfld_;
     uiGenInput*     gatefld_;
 
     bool        setParameters(const Attrib::Desc&);
     bool        setInput(const Attrib::Desc&);
+    bool		setOutput(const Attrib::Desc&);
     bool        getParameters(Attrib::Desc&);
     bool        getInput(Attrib::Desc&);
+    bool		getOutput(Attrib::Desc&);
 
                 mDeclReqAttribUIFns
 };

@@ -36,7 +36,7 @@ mAttrDefCreateInstance(AVOPolarAttrib)
     
 void AVOPolarAttrib::initClass()
 {
-	mAttrStartInitClassWithUpdate
+	mAttrStartInitClass
 
 //    EnumParam* output = new EnumParam( outputStr() );
 //    output->addEnum( "Background Angle" );
@@ -61,11 +61,6 @@ void AVOPolarAttrib::initClass()
 
     desc->setNrOutputs( Seis::UnknowData, 6 );
     mAttrEndInitClass
-}
-
-void AVOPolarAttrib::updateDesc( Desc& desc )
-{
-//    BufferString output = desc.getValParam( outputStr() )->getStringValue();
 }
 
 AVOPolarAttrib::AVOPolarAttrib( Desc& desc )

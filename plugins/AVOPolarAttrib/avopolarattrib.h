@@ -36,7 +36,7 @@ namespace Attrib
 {
 
 mClass(AVOPolarAttrib) AVOPolarAttrib : public Provider
-{
+{ mODTextTranslationClass(AVOPolarAttrib);
 public:
     static void         initClass();
                         AVOPolarAttrib(Desc&);
@@ -51,10 +51,8 @@ public:
 
     
 protected:
-                        ~AVOPolarAttrib();
+                        ~AVOPolarAttrib() {}
     static Provider*    createInstance(Desc&);
-    static void			updateDesc(Desc&);
-
 
     bool                allowParallelComputation() const { return false; }
 

@@ -74,7 +74,6 @@ bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
     if ( desc.attribName() != AVOPolarAttrib::attribName() )
 	return false;
 
-    mIfGetEnum(AVOPolarAttrib::outputStr(),output, outputfld_->setValue(output) )
     mIfGetFloatInterval(AVOPolarAttrib::gateBGStr(), gateBG, gateBGfld_->setValue(gateBG))
     mIfGetBinID(AVOPolarAttrib::soBGStr(),soBG,stepoutBGfld_->setBinID(soBG))
     mIfGetFloatInterval(AVOPolarAttrib::gateStr(), gate, gatefld_->setValue(gate))
@@ -90,13 +89,18 @@ bool uiAVOPolarAttrib::setInput( const Attrib::Desc& desc )
     return true;
 }
 
+bool uiAVOPolarAttrib::setOutput( const Desc& desc )
+{
+    outputfld_->setValue( desc.selectedOutput() );
+    return true;
+}
+
 
 bool uiAVOPolarAttrib::getParameters( Attrib::Desc& desc )
 {
     if ( desc.attribName() != AVOPolarAttrib::attribName() )
         return false;
 
-    mSetEnum( AVOPolarAttrib::outputStr(), outputfld_->getIntValue() );
     mSetBinID( AVOPolarAttrib::soBGStr(), stepoutBGfld_->getBinID() );
     mSetFloatInterval( AVOPolarAttrib::gateBGStr(), gateBGfld_->getFInterval() );
     mSetFloatInterval( AVOPolarAttrib::gateStr(), gatefld_->getFInterval() );
@@ -112,5 +116,10 @@ bool uiAVOPolarAttrib::getInput( Attrib::Desc& desc )
     return true;
 }
 
+bool uiAVOPolarAttrib::getOutput( Desc& desc )
+{
+    fillOutput( desc, outputfld_->getIntValue() );
+    return true;
+}
 
 
