@@ -35,8 +35,8 @@ Calculate AVO polarization, strength and related attributes
 namespace Attrib
 {
 
-mClass(AVOPolarAttrib) AVOPolarAttrib : public Provider
-{ mODTextTranslationClass(AVOPolarAttrib);
+mExpClass(AVOPolarAttrib) AVOPolarAttrib : public Provider
+{ 
 public:
     static void         initClass();
                         AVOPolarAttrib(Desc&);

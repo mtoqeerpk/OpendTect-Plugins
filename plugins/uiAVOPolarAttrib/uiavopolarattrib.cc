@@ -42,7 +42,7 @@ static const char* outputstr[] =
 };
 
 
-mInitAttribUI(uiAVOPolarAttrib,AVOPolarAttrib,"AVO Polarization Attribute",sKeyFilterGrp())
+mInitAttribUI(uiAVOPolarAttrib,AVOPolarAttrib,"AVO Polarization Attribute",sKeyBasicGrp())
 
 
 uiAVOPolarAttrib::uiAVOPolarAttrib( uiParent* p, bool is2d )
@@ -66,7 +66,7 @@ uiAVOPolarAttrib::uiAVOPolarAttrib( uiParent* p, bool is2d )
     gatefld_ = new uiGenInput( this, zDepLabel(tr("Local "), tr("gate")), FloatInpIntervalSpec().setName("Z start",0).setName("Z stop",1));
     gatefld_->attach( alignedBelow, gateBGfld_ );
     
-    setHAlignObj( outputfld_ );
+    setHAlignObj( inp_interceptfld_ );
 }
 
 bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
@@ -74,9 +74,9 @@ bool uiAVOPolarAttrib::setParameters( const Attrib::Desc& desc )
     if ( desc.attribName() != AVOPolarAttrib::attribName() )
 	return false;
 
-    mIfGetFloatInterval(AVOPolarAttrib::gateBGStr(), gateBG, gateBGfld_->setValue(gateBG))
-    mIfGetBinID(AVOPolarAttrib::soBGStr(),soBG,stepoutBGfld_->setBinID(soBG))
-    mIfGetFloatInterval(AVOPolarAttrib::gateStr(), gate, gatefld_->setValue(gate))
+    mIfGetFloatInterval(AVOPolarAttrib::gateBGStr(), gateBG, gateBGfld_->setValue(gateBG));
+    mIfGetBinID(AVOPolarAttrib::soBGStr(),soBG,stepoutBGfld_->setBinID(soBG));
+    mIfGetFloatInterval(AVOPolarAttrib::gateStr(), gate, gatefld_->setValue(gate));
     
     return true;
 }

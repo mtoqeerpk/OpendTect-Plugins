@@ -19,9 +19,6 @@ ________________________________________________________________________
 
 #include "avopolarattrib.h"
 #include "odplugin.h"
-#include "avopolarattribmod.h"
-
-
 
 mDefODPluginEarlyLoad(AVOPolarAttrib)
 
